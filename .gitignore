@@ -1,0 +1,11 @@
+embeddings.json
+embeddings.joblib
+*.joblib
+*.json
+!package.json
+__pycache__/
+.env
+videos/
+audios/
+*.mp4
+*.mp3
