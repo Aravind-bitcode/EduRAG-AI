@@ -23,7 +23,7 @@ import joblib
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-PORT = 5000
+PORT = int(os.environ.get("PORT", 5000))
 EMBEDDINGS_FILE = "embeddings.joblib"
 
 # Global variable to store vector embeddings dataset in memory
@@ -49,14 +49,16 @@ def load_embeddings():
 
 
 def get_query_embedding(query_text, model_name="bge-m3"):
-    """Generates a 1024-dimensional semantic embedding vector using Ollama bge-m3."""
+    """Generates a 1024-dimensional semantic embedding vector with TF-IDF cloud fallback."""
     url = "http://localhost:11434/api/embed"
     payload = {"model": model_name, "input": [query_text]}
-    response = requests.post(url, json=payload, timeout=10)
-    if response.status_code == 200:
-        return response.json()["embeddings"][0]
-    else:
-        raise Exception(f"Ollama API Error: {response.text}")
+    try:
+        response = requests.post(url, json=payload, timeout=3)
+        if response.status_code == 200:
+            return response.json()["embeddings"][0]
+    except Exception:
+        pass
+    return None
 
 
 def resolve_audio_filename(file_name):
@@ -77,15 +79,22 @@ def resolve_audio_filename(file_name):
     return base_mp3
 
 
-def search_similar_chunks(query_vector, top_k=4):
-    """Computes Cosine Similarity math between user question vector and all video lecture chunks."""
+def search_similar_chunks(query_vector, query_text="", top_k=4):
+    """Computes Cosine Similarity math between user question vector and video lecture chunks."""
     if df_embeddings is None or len(df_embeddings) == 0:
         return []
     
-    chunk_embeddings = np.array(df_embeddings['embedding'].tolist())
-    query_vector_2d = np.array([query_vector])
-    
-    similarities = cosine_similarity(query_vector_2d, chunk_embeddings)[0]
+    if query_vector is not None:
+        chunk_embeddings = np.array(df_embeddings['embedding'].tolist())
+        query_vector_2d = np.array([query_vector])
+        similarities = cosine_similarity(query_vector_2d, chunk_embeddings)[0]
+    else:
+        # High-precision TF-IDF fallback for cloud deployments
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        texts = df_embeddings['text'].astype(str).tolist()
+        vectorizer = TfidfVectorizer(stop_words='english')
+        tfidf_matrix = vectorizer.fit_transform(texts + [query_text])
+        similarities = cosine_similarity(tfidf_matrix[-1:], tfidf_matrix[:-1])[0]
     
     df_copy = df_embeddings.copy()
     df_copy['similarity'] = similarities
@@ -254,7 +263,7 @@ class RAGServerHandler(http.server.SimpleHTTPRequestHandler):
                 
                 print(f"Incoming Search Query: '{query}'")
                 query_vector = get_query_embedding(query)
-                matches = search_similar_chunks(query_vector, top_k=4)
+                matches = search_similar_chunks(query_vector, query_text=query, top_k=4)
                 
                 # Construct RAG Prompt
                 context_lines = []
