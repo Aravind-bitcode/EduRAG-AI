@@ -27,7 +27,7 @@ DEFAULT_LECTURE_CHUNKS = [
         "start": 0.0,
         "end": 120.0,
         "text": "VS Code is the industry standard code editor for modern Web Development. Websites work via client-server HTTP requests rendering HTML, CSS, and JavaScript in the browser.",
-        "audio_file": "01_intro.mp3",
+        "audio_file": "1_Installing VS Code & How Websites Work.mp3",
         "similarity": 0.95
     },
     {
@@ -37,7 +37,7 @@ DEFAULT_LECTURE_CHUNKS = [
         "start": 15.0,
         "end": 180.0,
         "text": "Every HTML5 document requires a <!DOCTYPE html> declaration, <html> root element, <head> for metadata/title, and <body> containing visible website content.",
-        "audio_file": "02_html_structure.mp3",
+        "audio_file": "3_Basic Structure of an HTML Website.mp3",
         "similarity": 0.91
     },
     {
@@ -47,7 +47,7 @@ DEFAULT_LECTURE_CHUNKS = [
         "start": 30.0,
         "end": 210.0,
         "text": "Use h1 through h6 tags for semantic content hierarchy. Paragraphs use <p> tags, and anchor tags <a href='...'> create hyperlinks to web pages.",
-        "audio_file": "03_headings_links.mp3",
+        "audio_file": "4_Heading, Paragraphs and Links.mp3",
         "similarity": 0.88
     },
     {
@@ -57,7 +57,7 @@ DEFAULT_LECTURE_CHUNKS = [
         "start": 45.0,
         "end": 240.0,
         "text": "The CSS Box Model consists of content box, padding inside borders, border width, and margin spacing outside elements. Box-sizing border-box simplifies layout math.",
-        "audio_file": "04_css_box_model.mp3",
+        "audio_file": "18_CSS Box Model - Margin, Padding & Borders.mp3",
         "similarity": 0.85
     },
     {
@@ -67,7 +67,7 @@ DEFAULT_LECTURE_CHUNKS = [
         "start": 20.0,
         "end": 190.0,
         "text": "HTML forms collect user data using <form action='...' method='POST'> with <input type='text'>, <input type='email'>, <input type='password'>, and <button type='submit'>.",
-        "audio_file": "05_forms_inputs.mp3",
+        "audio_file": "7_Forms and input tags in HTML.mp3",
         "similarity": 0.82
     }
 ]
@@ -103,6 +103,25 @@ def load_embeddings():
 
 # Load dataset at module startup
 load_embeddings()
+
+
+def get_real_audio_filename(file_name, title=""):
+    """Maps transcript filename to actual existing MP3 audio filename in audios/ folder."""
+    base_mp3 = file_name.replace('.json', '.mp3')
+    if not os.path.exists("audios"):
+        return base_mp3
+
+    if os.path.exists(os.path.join("audios", base_mp3)):
+        return base_mp3
+
+    prefix = file_name.split("_")[0].lstrip("0") if "_" in file_name else ""
+    if prefix:
+        for f in os.listdir("audios"):
+            f_prefix = f.split("_")[0].lstrip("0") if "_" in f else ""
+            if f_prefix == prefix:
+                return f
+
+    return base_mp3
 
 
 def search_similar_chunks(query_text="", top_k=4):
@@ -143,6 +162,8 @@ def search_similar_chunks(query_text="", top_k=4):
             else:
                 clean_title = title
 
+            audio_file = get_real_audio_filename(file_name, clean_title)
+
             results.append({
                 "chunk_id": int(row.get('chunk_id', 1)),
                 "file_name": file_name,
@@ -151,7 +172,7 @@ def search_similar_chunks(query_text="", top_k=4):
                 "end": float(row.get('end', 0.0)),
                 "text": str(row.get('text', '')).strip(),
                 "similarity": float(row.get('similarity', 0.88)),
-                "audio_file": file_name.replace('.json', '.mp3')
+                "audio_file": audio_file
             })
 
         return results if results else DEFAULT_LECTURE_CHUNKS[:top_k]
@@ -221,13 +242,18 @@ def serve_audio(filename):
     if os.path.exists(audio_path):
         return send_from_directory("audios", filename)
 
-    # Dynamic WAV audio synthesizer stream so player duration & playhead are 100% clickable & seekable
+    # Search for matching file in audios folder
+    if os.path.exists("audios"):
+        for f in os.listdir("audios"):
+            if f == filename or f.endswith(filename):
+                return send_from_directory("audios", f)
+
+    # Dynamic WAV audio synthesizer stream fallback
     buffer = io.BytesIO()
     with wave.open(buffer, 'wb') as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(1)
         wav_file.setframerate(8000)
-        # 1800 seconds (30 minutes) of audio stream
         num_samples = 8000 * 1800
         tone_data = bytes([128 + int(15 * (i % 100 > 50)) for i in range(num_samples)])
         wav_file.writeframes(tone_data)
