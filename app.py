@@ -285,7 +285,10 @@ ANSWER:"""
 
                 ai_response = generate_llm_response(prompt)
                 if not ai_response:
-                    ai_response = f"Based on your search query **\"{query}\"**, the most relevant tutorial videos are listed below. Key context: {matches[0]['text']}"
+                    if matches:
+                        ai_response = f"Based on your search query **\"{query}\"**, the most relevant tutorial videos are listed below. Key context: {matches[0]['text']}"
+                    else:
+                        ai_response = f"Based on your search query **\"{query}\"**, relevant Web Development tutorial lecture segments have been retrieved below."
 
                 response_data = {
                     "query": query,

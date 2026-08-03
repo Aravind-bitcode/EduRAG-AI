@@ -1,8 +1,5 @@
 embeddings.json
-embeddings.joblib
-*.joblib
-*.json
-!package.json
+!embeddings.joblib
 __pycache__/
 .env
 videos/
