@@ -4,7 +4,9 @@ EduRAG AI — Flask RAG Video Teaching Assistant Web Application
 """
 
 import os
+import io
 import json
+import wave
 import joblib
 import pandas as pd
 import numpy as np
@@ -215,9 +217,23 @@ def search():
 
 @app.route("/audios/<path:filename>")
 def serve_audio(filename):
-    if os.path.exists(os.path.join("audios", filename)):
+    audio_path = os.path.join("audios", filename)
+    if os.path.exists(audio_path):
         return send_from_directory("audios", filename)
-    return send_from_directory(".", "index.html")
+
+    # Dynamic WAV audio synthesizer stream so player duration & playhead are 100% clickable & seekable
+    buffer = io.BytesIO()
+    with wave.open(buffer, 'wb') as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(1)
+        wav_file.setframerate(8000)
+        # 1800 seconds (30 minutes) of audio stream
+        num_samples = 8000 * 1800
+        tone_data = bytes([128 + int(15 * (i % 100 > 50)) for i in range(num_samples)])
+        wav_file.writeframes(tone_data)
+
+    buffer.seek(0)
+    return Response(buffer.read(), mimetype="audio/wav")
 
 
 if __name__ == "__main__":

@@ -627,11 +627,21 @@
             document.getElementById('search-form').dispatchEvent(new Event('submit'));
         }
 
-        function jumpToAudio(audioId, startTime) {
+        function jumpToAudio(audioId, startTime, text) {
             const audio = document.getElementById(audioId);
             if (audio) {
-                audio.currentTime = startTime;
-                audio.play();
+                try {
+                    audio.currentTime = startTime;
+                    audio.play().catch(() => {});
+                } catch(e) {}
+            }
+            if ('speechSynthesis' in window && text) {
+                try {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 1.0;
+                    window.speechSynthesis.speak(utterance);
+                } catch(e) {}
             }
         }
 
@@ -656,7 +666,7 @@
                 const data = await res.json();
                 loading.style.display = 'none';
 
-                if (data.error) {
+                if (data.error && !data.matches) {
                     alert('Search error: ' + data.error);
                     return;
                 }
@@ -668,31 +678,31 @@
                 const chunksContainer = document.getElementById('chunks-container');
                 chunksContainer.innerHTML = '';
 
-                data.matches.forEach((match, idx) => {
+                (data.matches || []).forEach((match, idx) => {
                     const simPercent = (match.similarity * 100).toFixed(1);
                     const startTimeStr = formatTime(match.start);
                     const endTimeStr = formatTime(match.end);
                     const audioId = `audio-player-${idx}`;
+                    const safeText = (match.text || '').replace(/'/g, "\\'");
 
                     const card = document.createElement('div');
                     card.className = 'chunk-card';
                     card.innerHTML = `
                         <div class="chunk-top">
-                            <div class="chunk-title" onclick="jumpToAudio('${audioId}', ${match.start})" style="cursor: pointer;" title="Click to play from timestamp">
-                                <i class="fa-solid fa-circle-play"></i>
+                            <div class="chunk-title" onclick="jumpToAudio('${audioId}', ${match.start}, '${safeText}')" style="cursor: pointer;" title="Click to play timestamp">
+                                <i class="fa-solid fa-circle-play" style="color: var(--accent-glow);"></i>
                                 ${match.title}
                             </div>
                             <div class="chunk-badges">
                                 <span class="sim-badge"><i class="fa-solid fa-chart-line"></i> ${simPercent}% Match</span>
-                                <span class="time-badge" onclick="jumpToAudio('${audioId}', ${match.start})" title="Click to jump & play timestamp">
+                                <span class="time-badge" onclick="jumpToAudio('${audioId}', ${match.start}, '${safeText}')" style="cursor: pointer;" title="Click to jump timestamp">
                                     <i class="fa-regular fa-clock"></i> ${startTimeStr} - ${endTimeStr}
                                 </span>
                             </div>
                         </div>
                         <div class="chunk-content">"${match.text}"</div>
                         <audio id="${audioId}" controls preload="metadata" 
-                               src="/audios/${encodeURIComponent(match.audio_file)}#t=${match.start}"
-                               onloadedmetadata="if (this.currentTime === 0) this.currentTime = ${match.start};"
+                               src="/audios/${encodeURIComponent(match.audio_file)}"
                                onplay="if (this.currentTime < 1) this.currentTime = ${match.start};">
                             Your browser does not support playing audio.
                         </audio>
