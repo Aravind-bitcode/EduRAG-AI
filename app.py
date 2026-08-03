@@ -186,6 +186,11 @@ def index():
     return send_file("index.html")
 
 
+@app.route("/favicon.svg")
+def favicon():
+    return send_file("favicon.svg", mimetype="image/svg+xml")
+
+
 @app.route("/api/course_info")
 def course_info():
     total = len(df_embeddings) if df_embeddings is not None else len(DEFAULT_LECTURE_CHUNKS)
