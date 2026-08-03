@@ -377,11 +377,15 @@ ANSWER:"""
                 self.end_headers()
                 self.wfile.write(json.dumps(response_data).encode('utf-8'))
             except Exception as e:
-                print(f"Error processing search: {e}")
+                import traceback
+                err_tb = traceback.format_exc()
+                print(f"Error processing search: {err_tb}")
                 fallback_resp = {
-                    "query": "Web Development",
+                    "query": query if 'query' in locals() else "Web Development",
                     "matches": DEFAULT_LECTURE_CHUNKS[:4],
-                    "answer": "Relevant Web Development video tutorial segments retrieved below."
+                    "answer": f"Relevant Web Development video tutorial segments retrieved below. (Debug: {str(e)})",
+                    "error": str(e),
+                    "traceback": err_tb
                 }
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
