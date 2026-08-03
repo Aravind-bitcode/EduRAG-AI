@@ -104,13 +104,16 @@ def load_embeddings():
 
 
 def get_query_embedding(query_text, model_name="bge-m3"):
-    """Generates 1024-dim embedding vector if local Ollama API is running."""
+    """Generates 1024-dim embedding vector if local Ollama API is running safely."""
     url = "http://localhost:11434/api/embed"
     payload = {"model": model_name, "input": [query_text]}
     try:
         response = requests.post(url, json=payload, timeout=2)
         if response.status_code == 200:
-            return response.json()["embeddings"][0]
+            res_json = response.json()
+            embeddings = res_json.get("embeddings", [])
+            if isinstance(embeddings, list) and len(embeddings) > 0:
+                return embeddings[0]
     except Exception:
         pass
     return None
